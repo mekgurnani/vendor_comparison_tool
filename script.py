@@ -25,47 +25,86 @@ if num_suppliers != "":
 output = io.BytesIO()
 
 # Create a workbook and worksheet using XlsxWriter
-with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-    workbook = writer.book
-    worksheet = workbook.add_worksheet("Supplier Quotation")
-    writer.sheets["Supplier Quotation"] = worksheet
+def generate_supplier_template(num_suppliers: int = 1, num_rows: int = 100):
+    output = io.BytesIO()
 
-    # Formats
-    bold_center = workbook.add_format({'bold': True, 'align': 'center', 'valign': 'vcenter', 'border': 1})
-    bold_left = workbook.add_format({'bold': True, 'align': 'left', 'valign': 'vcenter', 'border': 1})
-
-    # Merge for "QUOTATION NAME"
-    worksheet.write('A1', 'QUOTATION NAME:', bold_left)
-
-    # Header row 2
+    # Build empty DataFrame with required structure
     headers_base = ['ITEM CODE', 'DESCRIPTION', 'QTY']
-    supplier_headers = [f"Supplier {i + 1}" for i in range(num_suppliers)]
-
-    # Merge supplier header
-    worksheet.merge_range(0, 3, 0, 3 + num_suppliers - 1, 'Suppliers', bold_center)
-
-    # Row 3: Column headers
-    for col, header in enumerate(headers_base + supplier_headers):
-        worksheet.write(1, col, header, bold_center)
-
+    supplier_headers = []
     for i in range(num_suppliers):
-        worksheet.write(2, 3 + i, "UP", bold_center)        
+        supplier_headers.extend([f"Supplier {i + 1}_UP", f"Supplier {i + 1}_AVAILABLE"])
 
-    # Set column widths (optional)
-    worksheet.set_column("A:A", 15)
-    worksheet.set_column("B:B", 25)
-    worksheet.set_column("C:C", 10)
-    worksheet.set_column("D:Z", 18)
+    all_columns = headers_base + supplier_headers
+    final_df = pd.DataFrame(columns=all_columns)
+    final_df = final_df.reindex(range(num_rows))  # Add empty rows
 
-    writer.close()
-    excel_data = output.getvalue()
+    # Start Excel writer
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        # Let pandas create the worksheet
+        final_df.to_excel(writer, sheet_name="Supplier Quotation", startrow=3, index=False, header=False)
+
+        workbook  = writer.book
+        worksheet = writer.sheets["Supplier Quotation"]
+
+        # Define formats
+        bold_center = workbook.add_format({'bold': True, 'align': 'center', 'valign': 'vcenter', 'border': 1})
+        bold_left   = workbook.add_format({'bold': True, 'align': 'left', 'valign': 'vcenter', 'border': 1})
+
+        # Row 1: QUOTATION NAME
+        worksheet.write('A1', 'QUOTATION NAME:', bold_left)
+
+        # Row 2: base headers
+        for col, header in enumerate(headers_base):
+            worksheet.write(1, col, header, bold_center)
+
+        # Row 2: merged supplier headers
+        for i in range(num_suppliers):
+            col_start = 3 + i * 2
+            col_end = col_start + 1
+            worksheet.merge_range(1, col_start, 1, col_end, f"Supplier {i + 1}", bold_center)
+
+        # Row 3: UP / AVAILABLE
+        for i in range(num_suppliers):
+            worksheet.write(2, 3 + i * 2, "UP", bold_center)
+            worksheet.write(2, 4 + i * 2, "AVAILABLE", bold_center)
+
+        # Row 1: merged "Suppliers"
+        worksheet.merge_range(0, 3, 0, 3 + (2 * num_suppliers) - 1, 'Suppliers', bold_center)
+
+        # Column widths
+        worksheet.set_column("A:A", 15)
+        worksheet.set_column("B:B", 25)
+        worksheet.set_column("C:C", 10)
+        worksheet.set_column("D:Z", 18)
+
+        # Data validation: dropdown for all AVAILABLE columns
+        validation_options = ['YES', 'NO', 'NOT SURE']
+        for i in range(num_suppliers):
+            available_col_index = 4 + (i * 2)
+            col_letter = xl_col_to_name(available_col_index)
+            print(i, col_letter)
+            cell_range = f"{col_letter}4:{col_letter}{3 + num_rows}"  # 1-based row numbers in Excel
+
+            worksheet.data_validation(cell_range, {
+                'validate': 'list',
+                'source': validation_options,
+                'input_message': 'Choose: YES, NO, or NOT SURE',
+                'error_title': 'Invalid Input',
+                'error_message': 'Only YES, NO, or NOT SURE are allowed',
+                # 'show_error_message': True
+            })
+
+    output.seek(0)
+    return output
+
+buffer = generate_supplier_template(num_suppliers=num_suppliers, num_rows=100)
 
 st.markdown("<h4><strong>2. Download the template below to add the quotations from different suppliers.</strong></h4>", 
             unsafe_allow_html=True)
 
 st.download_button(
     label="📥 Download Supplier Comparison Template",
-    data=excel_data,
+    data=buffer,
     file_name="supplier_comparison_template.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
@@ -78,6 +117,7 @@ st.markdown("""
 - Fill in the **quotation name**, **correct item codes**, **quantities required**, and **unit prices** for each vendor.
 - Do **not** change the any column headers.
 - Replace cells with Supplier 1, Supplier 2, etc., with the **actual names** of the suppliers. 
+- Select the availability of each item from the dropdowns in the **AVAILABLE** columns.
 - Save the file **in Excel format (.xlsx)** before uploading.
 - Once completed, return here and upload the file using the uploader below.
 
@@ -157,7 +197,7 @@ input_suppliers_lower = set(s.lower() for s in supplier_names_input)
 # print(uploaded_file)
 
 file = pd.read_excel(uploaded_file, sheet_name='Supplier Quotation', header=[1,2])
-print(file)
+# print(file)
 
 # new_columns = []
 # for col in template.columns:
@@ -168,6 +208,8 @@ print(file)
 # template.columns = new_columns
 
 # print(template.columns)
+
+#TODO next to enable functionality to work with merged supplier header because of added availability columns and highlighted functionality for yellow for unavailable products 
 
 def modify_uploaded_file(uploaded_file, supplier_names):
     """
