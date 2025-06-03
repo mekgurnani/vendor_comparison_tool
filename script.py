@@ -267,8 +267,6 @@ def modify_uploaded_file(uploaded_file, supplier_names):
 
 modified_df, excel_buffer = modify_uploaded_file(supplier_names=supplier_names_input, uploaded_file=file)
 
-st.dataframe(modified_df)
-
 st.download_button(
     label="Download Quotation with Highlights",
     data=excel_buffer,
