@@ -5,114 +5,38 @@ import xlsxwriter
 import io
 import streamlit as st
 from xlsxwriter.utility import xl_col_to_name
+from funcs import generate_supplier_template, modify_uploaded_file
 
 st.title("Vendor Supplier Comparison")
 
-st.markdown("<h4><strong>1. How many suppliers would you like to compare?</strong></h4>",
-            unsafe_allow_html=True)
+# st.markdown("<h4><strong>1. How many suppliers would you like to compare?</strong></h4>",
+            # unsafe_allow_html=True)
 
-options = [""] + list(range(1, 21))
+options = list(range(1, 21))
 
 num_suppliers = st.selectbox(
-    label="",
+    label = "1. How many suppliers would you like to compare?",
+    placeholder = "Select number of suppliers",
+    # label_visibility= None,
     options=options,
-    format_func=lambda x: "Select number" if x == "" else str(x)
+    # format_func=lambda x: "Select number" if x == "" else str(x)
 )
 
-if num_suppliers != "":
-    num_suppliers = int(num_suppliers)
+# if num_suppliers != "":
+#     num_suppliers = int(num_suppliers)
 
 output = io.BytesIO()
 
 # Create a workbook and worksheet using XlsxWriter
-def generate_supplier_template(num_suppliers: int = 1, num_rows: int = 100):
-    output = io.BytesIO()
-
-    # Build empty DataFrame with required structure
-    headers_base = ['ITEM CODE', 'DESCRIPTION', 'QTY']
-    supplier_headers = []
-    for i in range(num_suppliers):
-        supplier_headers.extend([f"Supplier {i + 1}_UP", f"Supplier {i + 1}_AVAILABLE"])
-
-    all_columns = headers_base + supplier_headers
-    final_df = pd.DataFrame(columns=all_columns)
-    final_df = final_df.reindex(range(num_rows))  # Add empty rows
-
-    # Start Excel writer
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        # Let pandas create the worksheet
-        final_df.to_excel(writer, sheet_name="Supplier Quotation", startrow=3, index=False, header=False)
-
-        workbook  = writer.book
-        worksheet = writer.sheets["Supplier Quotation"]
-
-        # Define formats
-        bold_center = workbook.add_format({'bold': True, 'align': 'center', 'valign': 'vcenter', 'border': 1})
-        bold_left   = workbook.add_format({'bold': True, 'align': 'left', 'valign': 'vcenter', 'border': 1})
-
-        # Row 1: QUOTATION NAME
-        worksheet.write('A1', 'QUOTATION NAME:', bold_left)
-
-        # Row 2: base headers
-        for col, header in enumerate(headers_base):
-            worksheet.write(1, col, header, bold_center)
-
-        # Row 2: merged supplier headers
-        for i in range(num_suppliers):
-            col_start = 3 + i * 2
-            col_end = col_start + 1
-            worksheet.merge_range(1, col_start, 1, col_end, f"Supplier {i + 1}", bold_center)
-
-        # Row 3: UP / AVAILABLE
-        for i in range(num_suppliers):
-            worksheet.write(2, 3 + i * 2, "UP", bold_center)
-            worksheet.write(2, 4 + i * 2, "AVAILABLE", bold_center)
-
-        # Row 1: merged "Suppliers"
-        worksheet.merge_range(0, 3, 0, 3 + (2 * num_suppliers) - 1, 'Suppliers', bold_center)
-
-        # Column widths
-        worksheet.set_column("A:A", 15)
-        worksheet.set_column("B:B", 25)
-        worksheet.set_column("C:C", 10)
-        worksheet.set_column("D:Z", 18)
-
-        # Data validation: dropdown for all AVAILABLE columns
-        validation_options = ['YES', 'NO', 'NOT SURE']
-        for i in range(num_suppliers):
-            available_col_index = 4 + (i * 2)
-            col_letter = xl_col_to_name(available_col_index)
-            print(i, col_letter)
-            cell_range = f"{col_letter}4:{col_letter}{3 + num_rows}"  # 1-based row numbers in Excel
-
-            worksheet.data_validation(cell_range, {
-                'validate': 'list',
-                'source': validation_options,
-                'input_message': 'Choose: YES, NO, or NOT SURE',
-                'error_title': 'Invalid Input',
-                'error_message': 'Only YES, NO, or NOT SURE are allowed',
-                # 'show_error_message': True
-            })
-
-    output.seek(0)
-    return output
 
 buffer = generate_supplier_template(num_suppliers=num_suppliers, num_rows=100)
 
-st.markdown("<h4><strong>2. Download the template below to add the quotations from different suppliers.</strong></h4>", 
+st.markdown("<h5><strong>1. Download the template below to add the quotations from different suppliers.</strong></h4>", 
             unsafe_allow_html=True)
 
-st.download_button(
-    label="📥 Download Supplier Comparison Template",
-    data=buffer,
-    file_name="supplier_comparison_template.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
-
 st.markdown("""
----
 
-### Instructions:
+###### Instructions:
 
 - Fill in the **quotation name**, **correct item codes**, **quantities required**, and **unit prices** for each vendor.
 - Do **not** change the any column headers.
@@ -121,12 +45,18 @@ st.markdown("""
 - Save the file **in Excel format (.xlsx)** before uploading.
 - Once completed, return here and upload the file using the uploader below.
 
----
 """, unsafe_allow_html=True)
+
+st.download_button(
+    label="📥 Download Supplier Comparison Template",
+    data=buffer,
+    file_name="supplier_comparison_template.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
 
 # User uploads file
 
-st.markdown("<h4><strong>3. Upload your completed Excel file below.</strong></h4>", 
+st.markdown("<h5><strong>2. Upload your completed Excel file below.</strong></h4>", 
             unsafe_allow_html=True)
 
 uploaded_file = st.file_uploader(
@@ -153,7 +83,7 @@ if 'names' not in st.session_state:
 if 'input_text' not in st.session_state:
     st.session_state.input_text = ""
 
-st.markdown("<h4><strong>4. Enter supplier names (must match with the names in the uploaded file)</strong></h4>", 
+st.markdown("<h5><strong>3. Enter supplier names (all upper case and must match with the names in the uploaded file)</strong></h4>", 
             unsafe_allow_html=True)
 
 multi_input = st.text_area(
@@ -180,7 +110,7 @@ if st.button("Add Names"):
 #TODO add check that number of suppliers given matches number of suppliers selected in the first step
 
 # Display added names with remove buttons
-st.markdown(f"<h4><strong>Added suppliers:</strong>",unsafe_allow_html=True)
+st.markdown(f"<h5><strong>Added suppliers (ensure these are correct):</strong>",unsafe_allow_html=True)
 for i, name in enumerate(st.session_state.names):
     col1, col2 = st.columns([5, 1])
     with col1:
@@ -192,11 +122,11 @@ for i, name in enumerate(st.session_state.names):
 
 # Start processing the doc
 supplier_names_input = st.session_state.names
-input_suppliers_lower = set(s.lower() for s in supplier_names_input)
+# input_suppliers_lower = set(s.lower() for s in supplier_names_input)
 
 # print(uploaded_file)
 
-file = pd.read_excel(uploaded_file, sheet_name='Supplier Quotation', header=[1,2])
+# file = pd.read_excel(uploaded_file, sheet_name='Supplier Quotation', header=[1,2])
 # print(file)
 
 # new_columns = []
@@ -209,112 +139,30 @@ file = pd.read_excel(uploaded_file, sheet_name='Supplier Quotation', header=[1,2
 
 # print(template.columns)
 
-#TODO next to enable functionality to work with merged supplier header because of added availability columns and highlighted functionality for yellow for unavailable products 
+#TODO next to enable functionality to work with merged supplier header because of added availability columns and highlighted functionality for yellow for unavailable products    
 
-def modify_uploaded_file(uploaded_file, supplier_names):
-    """
-    Args:
-    uploaded_file: DataFrame containing the uploaded Excel file.
-    supplier_names: List of supplier names to be processed (#TODO: make this input flexy as needed)
+if uploaded_file is not None and st.session_state.names:
+    try:
+        file = pd.read_excel(uploaded_file, sheet_name='Supplier Quotation', header=[1, 2])
+        modified_df, excel_buffer = modify_uploaded_file(supplier_names=supplier_names_input, uploaded_file=file)
 
-    Modifies the uploaded excel file
-    - finds unit price columns
-    - adds total price columns for each supplier
-    - add summary row
-    - Highlights lowest unit prices per row and lowest total in summary
+        st.download_button(
+            label="📥 Download Quotation with Highlights",
+            data=excel_buffer,
+            file_name="highlighted_quotation.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    except Exception as e:
+        st.error(f"❌ Error processing the file: {e}")
 
+# modified_df, excel_buffer = modify_uploaded_file(supplier_names=supplier_names_input, uploaded_file=file)
 
-    """
-
-    # 1. Make unit price columns and total price columns
-
-    new_columns = []
-    for col in uploaded_file.columns:
-
-        if isinstance(col, tuple) and col[0].lower() in input_suppliers_lower:
-            new_columns.append('_'.join(col).strip())  # e.g., HERMES_UP
-        else:
-            new_columns.append(col[0] if isinstance(col, tuple) else col)  # e.g., ITEM CODE, QTY
-    uploaded_file.columns = new_columns
-
-    for supplier in supplier_names:
-        supplier_col = f"{supplier}_UP"
-        col_index = uploaded_file.columns.get_loc(supplier_col)
-        if supplier_col in uploaded_file.columns:
-            total_values = uploaded_file[supplier_col] * file['QTY']
-            uploaded_file.insert(loc=col_index + 1, column=f"{supplier}_TOTAL", value=total_values)
-        else:
-            print(f"Warning: Column {supplier_col} not found in the template.")
-
-    blank_row = pd.DataFrame([{col: "" for col in uploaded_file.columns}])
-
-    # 2: Add summary row for each supplier
-    summary_row = {'ITEM CODE': 'TOTAL_QUOTE'}  # you can also label 'DESCRIPTION' or a new column
-    for col in uploaded_file.columns:
-        if col.endswith("_TOTAL"):
-            summary_row[col] = uploaded_file[col].sum()
-
-    summary_row_df = pd.DataFrame([summary_row])
-
-    # 3: Concatenate everything
-    final_df = pd.concat([uploaded_file, blank_row, summary_row_df], ignore_index=True)
-
-    # 4: Apply highlighting 
-    # for each row, highlight lowest UP per supplier
-    # lowest total per supplier
-    # rearrange to show supplier with lowest total cols after qty
-    output_buffer = io.BytesIO()
-    with pd.ExcelWriter(output_buffer, engine='xlsxwriter') as writer:
-        final_df.to_excel(writer, index=False, sheet_name='Quotation')
-        workbook = writer.book
-        green_format = workbook.add_format({'bg_color': '#C6EFCE', 'font_color': '#006100'})  # light green fill, dark green text
-        worksheet = writer.sheets['Quotation']
-
-        # Highlight lowest UP per row
-    # green_format = workbook.add_format({'bg_color': '#C6EFCE', 'font_color': '#006100'})
-
-# Highlight lowest UP per row
-        up_cols = [f"{supplier}_UP" for supplier in supplier_names if f"{supplier}_UP" in final_df.columns]
-        for row in range(1, len(uploaded_file) + 1):  # Data rows only
-            col_letters = [xl_col_to_name(final_df.columns.get_loc(col)) for col in up_cols]
-            row_num = row + 1  # 1-based Excel row
-            if col_letters:
-                range_expr = ",".join(f"{letter}{row_num}" for letter in col_letters)
-                formula = f"MIN({range_expr})"
-                for letter in col_letters:
-                    cell = f"{letter}{row_num}"
-                    worksheet.conditional_format(cell, {
-                        'type': 'formula',
-                        'criteria': f"{cell}={formula}",
-                        'format': green_format
-                    })
-
-        # Highlight lowest total in summary row
-        total_cols = [f"{supplier}_TOTAL" for supplier in supplier_names if f"{supplier}_TOTAL" in final_df.columns]
-        summary_row_index = len(final_df) + 1  # 1-based
-        summary_letters = [xl_col_to_name(final_df.columns.get_loc(col)) for col in total_cols]
-        if summary_letters:
-            range_expr = ",".join(f"{letter}{summary_row_index}" for letter in summary_letters)
-            formula = f"MIN({range_expr})"
-            for letter in summary_letters:
-                cell = f"{letter}{summary_row_index}"
-                worksheet.conditional_format(cell, {
-                    'type': 'formula',
-                    'criteria': f"{cell}={formula}",
-                    'format': green_format
-                })
-
-        output_buffer.seek(0)
-    return final_df, output_buffer    
-
-modified_df, excel_buffer = modify_uploaded_file(supplier_names=supplier_names_input, uploaded_file=file)
-
-st.download_button(
-    label="Download Quotation with Highlights",
-    data=excel_buffer,
-    file_name="highlighted_quotation.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
+# st.download_button(
+#     label="Download Quotation with Highlights",
+#     data=excel_buffer,
+#     file_name="highlighted_quotation.xlsx",
+#     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+# )
 
 
 
