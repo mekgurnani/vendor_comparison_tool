@@ -19,13 +19,11 @@ def generate_supplier_template(num_suppliers: int = 1, num_rows: int = 100):
 
     # Start Excel writer
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        # Let pandas create the worksheet
         final_df.to_excel(writer, sheet_name="Supplier Quotation", startrow=3, index=False, header=False)
 
         workbook  = writer.book
         worksheet = writer.sheets["Supplier Quotation"]
 
-        # Define formats
         bold_center = workbook.add_format({'bold': True, 'align': 'center', 'valign': 'vcenter', 'border': 1})
         bold_left   = workbook.add_format({'bold': True, 'align': 'left', 'valign': 'vcenter', 'border': 1})
 
@@ -93,6 +91,8 @@ def modify_uploaded_file(uploaded_file, supplier_names):
 
     # 1. Make unit price columns and total price columns
     input_suppliers_lower = set(s.lower() for s in supplier_names)
+    input_suppliers_upper = set(s.upper() for s in supplier_names)
+
     new_columns = []
     for col in uploaded_file.columns:
 
@@ -104,12 +104,10 @@ def modify_uploaded_file(uploaded_file, supplier_names):
     uploaded_file.columns = new_columns
     # print(uploaded_file.columns)
 
-    for supplier in supplier_names:
+    for supplier in input_suppliers_upper:
         up_col = f"{supplier}_UP"
-        # avail_col = f"{supplier}_AVAILABLE"
 
         up_index = uploaded_file.columns.get_loc(up_col)
-        # avail_index = uploaded_file.columns.get_loc(avail_col)
 
         if up_col in uploaded_file.columns:
             total_values = uploaded_file[up_col] * uploaded_file['QTY']
@@ -120,7 +118,7 @@ def modify_uploaded_file(uploaded_file, supplier_names):
     blank_row = pd.DataFrame([{col: "" for col in uploaded_file.columns}])
 
     # 2: Add summary row for each supplier
-    summary_row = {'ITEM CODE': 'TOTAL_QUOTE'}  # you can also label 'DESCRIPTION' or a new column
+    summary_row = {'ITEM CODE': 'TOTAL_QUOTE'}  
     for col in uploaded_file.columns:
         if col.endswith("_TOTAL"):
             summary_row[col] = uploaded_file[col].sum()
@@ -133,7 +131,7 @@ def modify_uploaded_file(uploaded_file, supplier_names):
     # 4: Apply highlighting 
     # for each row, highlight lowest UP per supplier
     # lowest total per supplier
-    # rearrange to show supplier with lowest total cols after qty
+    # and highlight availability columns with specific colors
     output_buffer = io.BytesIO()
     with pd.ExcelWriter(output_buffer, engine='xlsxwriter') as writer:
         final_df.to_excel(writer, index=False, sheet_name='Quotation')
@@ -148,7 +146,7 @@ def modify_uploaded_file(uploaded_file, supplier_names):
     # green_format = workbook.add_format({'bg_color': '#C6EFCE', 'font_color': '#006100'})
 
     # Highlight lowest UP per row
-        up_cols = [f"{supplier}_UP" for supplier in supplier_names if f"{supplier}_UP" in final_df.columns]
+        up_cols = [f"{supplier}_UP" for supplier in input_suppliers_upper if f"{supplier}_UP" in final_df.columns]
         for row in range(1, len(uploaded_file) + 1):  # Data rows only
             col_letters = [xl_col_to_name(final_df.columns.get_loc(col)) for col in up_cols]
             row_num = row + 1  # 1-based Excel row
@@ -164,7 +162,7 @@ def modify_uploaded_file(uploaded_file, supplier_names):
                     })
 
     # Highlight lowest total in summary row
-        total_cols = [f"{supplier}_TOTAL" for supplier in supplier_names if f"{supplier}_TOTAL" in final_df.columns]
+        total_cols = [f"{supplier}_TOTAL" for supplier in input_suppliers_upper if f"{supplier}_TOTAL" in final_df.columns]
         summary_row_index = len(final_df) + 1  # 1-based
         summary_letters = [xl_col_to_name(final_df.columns.get_loc(col)) for col in total_cols]
         if summary_letters:
@@ -181,7 +179,7 @@ def modify_uploaded_file(uploaded_file, supplier_names):
         output_buffer.seek(0)
 
     # Highlighting the availability columns
-        avail_cols = [f"{supplier}_AVAILABLE" for supplier in supplier_names if f"{supplier}_AVAILABLE" in final_df.columns]
+        avail_cols = [f"{supplier}_AVAILABLE" for supplier in input_suppliers_upper if f"{supplier}_AVAILABLE" in final_df.columns]
 
         for row in range(1, len(uploaded_file) + 1):  # Adjusted for Excel's 1-based indexing
             row_num = row + 1  # Excel row (data starts at row 4 = index 3)

@@ -9,25 +9,17 @@ from funcs import generate_supplier_template, modify_uploaded_file
 
 st.title("Vendor Supplier Comparison")
 
-# st.markdown("<h4><strong>1. How many suppliers would you like to compare?</strong></h4>",
-            # unsafe_allow_html=True)
-
 options = list(range(1, 21))
 
 num_suppliers = st.selectbox(
     label = "1. How many suppliers would you like to compare?",
     placeholder = "Select number of suppliers",
-    # label_visibility= None,
     options=options,
-    # format_func=lambda x: "Select number" if x == "" else str(x)
 )
-
-# if num_suppliers != "":
-#     num_suppliers = int(num_suppliers)
 
 output = io.BytesIO()
 
-# Create a workbook and worksheet using XlsxWriter
+# Provide a template for supplier comparison
 
 buffer = generate_supplier_template(num_suppliers=num_suppliers, num_rows=100)
 
@@ -54,7 +46,7 @@ st.download_button(
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
 
-# User uploads file
+# User uploads completed template
 
 st.markdown("<h5><strong>2. Upload your completed Excel file below.</strong></h4>", 
             unsafe_allow_html=True)
@@ -67,7 +59,6 @@ uploaded_file = st.file_uploader(
 #TODO add check that correct file (no changed headers, etc.) is uploaded or throw an error below
 
 if uploaded_file is not None:
-    # Try to read the file
     try:
         df = pd.read_excel(uploaded_file)
         st.success("✅ File uploaded successfully!")
@@ -87,12 +78,12 @@ st.markdown("<h5><strong>3. Enter supplier names (all upper case and must match 
             unsafe_allow_html=True)
 
 multi_input = st.text_area(
-    label="",  # no label here
+    label="",  
     value=st.session_state.input_text,
     key="name_input_area"
 )
 
-# Add names
+# User adds supplier names
 if st.button("Add Names"):
     if multi_input:
         new_names = [name.strip() for part in multi_input.splitlines() for name in part.split(",") if name.strip()]
@@ -108,6 +99,7 @@ if st.button("Add Names"):
         st.warning("Please enter at least one name.")
 
 #TODO add check that number of suppliers given matches number of suppliers selected in the first step
+#TODO more flexibility for format of suppliers added (lower case, upper case)
 
 # Display added names with remove buttons
 st.markdown(f"<h5><strong>Added suppliers (ensure these are correct):</strong>",unsafe_allow_html=True)
