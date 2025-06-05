@@ -93,6 +93,9 @@ def modify_uploaded_file(uploaded_file, supplier_names):
     input_suppliers_lower = set(s.lower() for s in supplier_names)
     input_suppliers_upper = set(s.upper() for s in supplier_names)
 
+    quotation_name = uploaded_file.iloc[0,1]
+    print(f"Quotation Name: {quotation_name}")
+
     new_columns = []
     for col in uploaded_file.columns:
 
@@ -140,10 +143,11 @@ def modify_uploaded_file(uploaded_file, supplier_names):
         red_format   = workbook.add_format({'bg_color': '#FFC7CE', 'font_color': '#9C0006'})   # Light red
         orange_format = workbook.add_format({'bg_color': '#FFEB9C', 'font_color': '#9C6500'})  # Light orange
 
-        worksheet = writer.sheets['Quotation']
+        bold_format = workbook.add_format({'bold': True})
 
-        # Highlight lowest UP per row
-    # green_format = workbook.add_format({'bg_color': '#C6EFCE', 'font_color': '#006100'})
+        worksheet = writer.sheets['Quotation']
+        worksheet.write(0, 0, 'QUOTATION NAME:', bold_format)
+        worksheet.write(0, 1, quotation_name)  
 
     # Highlight lowest UP per row
         up_cols = [f"{supplier}_UP" for supplier in input_suppliers_upper if f"{supplier}_UP" in final_df.columns]
