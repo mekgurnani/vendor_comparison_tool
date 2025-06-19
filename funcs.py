@@ -4,6 +4,16 @@ import io
 import streamlit as st
 from xlsxwriter.utility import xl_col_to_name
 
+def login_screen():
+    st.header("This app is private.")
+    st.subheader("Please log in.")
+    st.button("Log in with Microsoft", on_click=st.login)
+
+def logout():
+    for key in st.session_state.keys():
+        del st.session_state[key]
+    st.rerun()    
+
 def generate_supplier_template(num_suppliers: int = 1, num_rows: int = 100):
     output = io.BytesIO()
 
@@ -74,7 +84,7 @@ def generate_supplier_template(num_suppliers: int = 1, num_rows: int = 100):
     output.seek(0)
     return output
 
-def modify_uploaded_file(uploaded_file, supplier_names):
+def modify_uploaded_file(uploaded_file, supplier_names, quotation_name):
     """
     Args:
     uploaded_file: DataFrame containing the uploaded Excel file.
@@ -93,8 +103,8 @@ def modify_uploaded_file(uploaded_file, supplier_names):
     input_suppliers_lower = set(s.lower() for s in supplier_names)
     input_suppliers_upper = set(s.upper() for s in supplier_names)
 
-    quotation_name = uploaded_file.iloc[0,1]
-    print(f"Quotation Name: {quotation_name}")
+    # quotation_name = uploaded_file.iloc[0,0]
+    # print(f"Quotation Name: {quotation_name}")
 
     new_columns = []
     for col in uploaded_file.columns:
@@ -105,7 +115,7 @@ def modify_uploaded_file(uploaded_file, supplier_names):
             new_columns.append(col[0] if isinstance(col, tuple) else col)  # e.g., ITEM CODE, QTY
 
     uploaded_file.columns = new_columns
-    # print(uploaded_file.columns)
+    # print(f"columns in uploaded file {uploaded_file.columns}")
 
     for supplier in input_suppliers_upper:
         up_col = f"{supplier}_UP"
@@ -118,7 +128,12 @@ def modify_uploaded_file(uploaded_file, supplier_names):
         else:
             print(f"Warning: Column {up_col} not found in the template.")
 
+    header = pd.DataFrame([{col: "" for col in uploaded_file.columns}])
+    header.iloc[0,0] = 'QUOTATION NAME:'
+    header.iloc[0,1] = quotation_name  
+
     blank_row = pd.DataFrame([{col: "" for col in uploaded_file.columns}])
+
 
     # 2: Add summary row for each supplier
     summary_row = {'ITEM CODE': 'TOTAL_QUOTE'}  
@@ -129,7 +144,10 @@ def modify_uploaded_file(uploaded_file, supplier_names):
     summary_row_df = pd.DataFrame([summary_row])
 
     # 3: Concatenate everything
+    # print(f"columns in uploaded file {uploaded_file.columns}")
     final_df = pd.concat([uploaded_file, blank_row, summary_row_df], ignore_index=True)
+    print("here")
+    print(uploaded_file)
 
     # 4: Apply highlighting 
     # for each row, highlight lowest UP per supplier
@@ -137,21 +155,29 @@ def modify_uploaded_file(uploaded_file, supplier_names):
     # and highlight availability columns with specific colors
     output_buffer = io.BytesIO()
     with pd.ExcelWriter(output_buffer, engine='xlsxwriter') as writer:
-        final_df.to_excel(writer, index=False, sheet_name='Quotation')
         workbook = writer.book
+        worksheet_name = "Quotation"
+
+        header.to_excel(writer, index=False, header=False, sheet_name=worksheet_name, startrow=0)
+        final_df.to_excel(writer, index=False, sheet_name=worksheet_name, startrow=1)
+
+        worksheet = writer.sheets['Quotation']
+
+        bold_format = workbook.add_format({'bold': True})
+
+        worksheet.write('A1', 'QUOTATION NAME:', bold_format)
+        worksheet.write('B1', quotation_name)
+
         green_format = workbook.add_format({'bg_color': '#C6EFCE', 'font_color': '#006100'})  # light green fill, dark green text
         red_format   = workbook.add_format({'bg_color': '#FFC7CE', 'font_color': '#9C0006'})   # Light red
         orange_format = workbook.add_format({'bg_color': '#FFEB9C', 'font_color': '#9C6500'})  # Light orange
 
-        bold_format = workbook.add_format({'bold': True})
-
-        worksheet = writer.sheets['Quotation']
-        worksheet.write(0, 0, 'QUOTATION NAME:', bold_format)
-        worksheet.write(0, 1, quotation_name)  
+        # worksheet.write(0, 0, 'QUOTATION NAME:', bold_format)
+        # worksheet.write(0, 1, quotation_name)  
 
     # Highlight lowest UP per row
         up_cols = [f"{supplier}_UP" for supplier in input_suppliers_upper if f"{supplier}_UP" in final_df.columns]
-        for row in range(1, len(uploaded_file) + 1):  # Data rows only
+        for row in range(1, len(uploaded_file) + 2):  # Data rows only
             col_letters = [xl_col_to_name(final_df.columns.get_loc(col)) for col in up_cols]
             row_num = row + 1  # 1-based Excel row
             if col_letters:
@@ -167,7 +193,7 @@ def modify_uploaded_file(uploaded_file, supplier_names):
 
     # Highlight lowest total in summary row
         total_cols = [f"{supplier}_TOTAL" for supplier in input_suppliers_upper if f"{supplier}_TOTAL" in final_df.columns]
-        summary_row_index = len(final_df) + 1  # 1-based
+        summary_row_index = len(final_df) + 2  # 1-based
         summary_letters = [xl_col_to_name(final_df.columns.get_loc(col)) for col in total_cols]
         if summary_letters:
             range_expr = ",".join(f"{letter}{summary_row_index}" for letter in summary_letters)
